@@ -1,0 +1,30 @@
+name: offline_first_wallet
+description: Offline-first mobile wallet — Flutter clean architecture with a hand-written Flutter↔Kotlin biometric channel.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^8.1.4
+  bloc_concurrency: ^0.2.5
+  equatable: ^2.0.5
+  get_it: ^7.6.7
+  dartz: ^0.10.1
+  sqflite: ^2.3.2
+  path: ^1.9.0
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  bloc_test: ^9.1.7
+  mocktail: ^1.0.3
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,9 @@
+// Add inside android { defaultConfig { } }:
+//   minSdkVersion 23   // BiometricPrompt requires API 23+
+//
+// Add to dependencies { }:
+//   implementation "androidx.biometric:biometric:1.1.0"
+//
+// This project is a scaffold: run `flutter create .` inside the folder once to
+// generate the full android/ gradle files, then apply the two lines above and
+// drop in the provided MainActivity.kt + AndroidManifest.xml.

@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .fvmrc   # single source of truth (FVM pin)
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test --coverage
+      - run: flutter build apk --debug

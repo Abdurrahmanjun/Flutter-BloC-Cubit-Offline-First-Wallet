@@ -1,0 +1,16 @@
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.gradle/
+local.properties
+key.properties
+*.jks
+ios/Pods/
+
+# FVM — pin config (.fvmrc) is committed, downloaded SDK is not
+.fvm/versions/
+.fvm/flutter_sdk
