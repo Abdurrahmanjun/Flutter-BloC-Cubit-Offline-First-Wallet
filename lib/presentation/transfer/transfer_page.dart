@@ -20,7 +20,7 @@ class _TransferPageState extends State<TransferPage> {
   final _amountController = TextEditingController();
 
   // Suggested contacts — tapping a chip fills the recipient.
-  static const _contacts = ['herza ard', 'f jiddane', 'andri b'];
+  static const _contacts = ['maya lawson', 'theo bennett', 'nina park'];
 
   @override
   void initState() {

@@ -31,7 +31,7 @@ class WalletLocalDataSource {
         // Seed a demo account so the app runs out of the box (clean-room fake data).
         await db.insert('account', const {
           'id': 'acc_demo',
-          'holder_name': 'Abdurrahman J. M.',
+          'holder_name': 'Jamie Carter',
           'balance_cents': 250000,
           'currency': 'USD',
         });

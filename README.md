@@ -1,8 +1,24 @@
 # 💳 Offline-First Wallet — Flutter + Native Android Biometrics
 
-A clean-architecture mobile wallet demonstrating **offline-first data**, **safe money movement**, and a **hand-written Flutter↔Kotlin biometric bridge** — the kind of app a fintech client actually needs.
+A clean-architecture mobile wallet demonstrating **offline-first data**, **safe money movement**, and a **hand-written Flutter↔Kotlin biometric bridge**
 
 > **Why this repo is different:** most Flutter wallet demos stop at the UI. This one crosses the native boundary (a custom `MethodChannel` to Android `BiometricPrompt`, no `local_auth` plugin) and treats money with the correctness a bank expects (integer cents, atomic DB writes, double-spend protection).
+
+---
+
+## 📱 Screenshots
+
+Captured on a physical Android device (Samsung Galaxy A55, Android 16).
+
+| Biometric unlock | Dashboard (light) | Dashboard (dark) |
+|:---:|:---:|:---:|
+| <img src="assets/screenshots/01_auth.png" width="240" alt="Native biometric unlock screen" /> | <img src="assets/screenshots/02_dashboard_light.png" width="240" alt="Dashboard in light theme" /> | <img src="assets/screenshots/03_dashboard_dark.png" width="240" alt="Dashboard in dark theme" /> |
+
+| Send money | Payment sent (offline) |
+|:---:|:---:|
+| <img src="assets/screenshots/04_transfer.png" width="240" alt="Send money screen with amount and recipient" /> | <img src="assets/screenshots/05_success.png" width="240" alt="Payment sent, queued offline for sync" /> |
+
+> The success screen — *"Queued offline · syncs when you reconnect"* — is the offline-first promise made visible: the transfer is durable on-device the instant you tap Send, network or not.
 
 ---
 
@@ -13,6 +29,7 @@ A clean-architecture mobile wallet demonstrating **offline-first data**, **safe 
 - **💸 Double-spend safe** — the transfer flow uses **Bloc with `droppable()`** so a double-tap on *Send* can never fire two transfers. A test proves the use case runs exactly once.
 - **🧮 Money done right** — amounts are integer **cents**, never `double`. Balance debit + transaction insert happen in one atomic SQLite transaction.
 - **🧱 Clean architecture** — `domain` (entities, use cases, repo interfaces) / `data` (sources, models, repo impl) / `presentation` (Cubit + Bloc). Dependencies point inward only.
+- **🎨 Considered UI** — a token-driven design system (`WalletTokens`) with a first-class **light & dark** theme, gradient balance card, and micro-interactions (pulsing unlock ring, press-scale actions). Fintech polish, not a scaffold.
 
 ## 🧠 State management — deliberate, not default
 
@@ -25,13 +42,29 @@ This "Cubit for the simple 80%, Bloc for the risky 20%" split is a decision I ca
 
 ## 🏗️ Architecture
 
+Three layers, one rule: **dependencies point inward.** `presentation` and `data` both depend on `domain`; `domain` depends on nothing. It knows only its own entities and repository *interfaces* — never Flutter, sqflite, or the network.
+
 ```
-presentation ─▶ domain ◀─ data
-  Cubit/Bloc      usecases     repo impl
-                  entities     local (sqflite)  ◀─ source of truth
-                  repo iface   remote (mock API)
-        core/platform ─▶ MethodChannel ─▶ Kotlin BiometricPrompt
+┌─ presentation ───────────────────────────────┐
+│  AuthCubit · DashboardCubit · TransferBloc   │  UI + state
+└──────────────────────┬───────────────────────┘
+                       │ calls use cases
+┌──────────────────────▼────────────────────────┐
+│                   domain                      │  pure Dart, no deps
+│  use cases · entities · repository interface  │  ◀── the contract
+└──────────────────────▲────────────────────────┘
+                       │ implements the interface
+┌──────────────────────┴────────────────────────┐
+│                    data                       │  fulfills the contract
+│  WalletRepositoryImpl                         │
+│    ├─ local  → sqflite   ◀── source of truth  │
+│    └─ remote → mock API  (background sync)    │
+└───────────────────────────────────────────────┘
+
+core/platform → MethodChannel → Kotlin BiometricPrompt   (native bridge)
 ```
+
+**Why it's built this way:** the repository interface lives in `domain`, but its implementation lives in `data`. So the transfer use case depends on an abstraction, not on SQLite — swap the data source (or mock it in a test) and `domain` never changes. That's the inversion that keeps money logic testable and framework-free.
 
 ## ▶️ Run it
 
