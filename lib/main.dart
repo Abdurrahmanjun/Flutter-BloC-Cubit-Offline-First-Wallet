@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injector.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
 import 'presentation/auth/auth_page.dart';
 import 'presentation/auth/cubit/auth_cubit.dart';
 
@@ -16,13 +17,24 @@ class WalletApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Offline-First Wallet',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      home: BlocProvider(
-        create: (_) => sl<AuthCubit>(),
-        child: const AuthPage(),
+    // App-wide light/dark switch. Exposed to descendants via
+    // [ThemeController.of] so the Home screen's moon/sun toggle can flip it.
+    return ThemeController(
+      child: Builder(
+        builder: (context) {
+          final mode = ThemeController.of(context).mode;
+          return MaterialApp(
+            title: 'Offline-First Wallet',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: mode,
+            home: BlocProvider(
+              create: (_) => sl<AuthCubit>(),
+              child: const AuthPage(),
+            ),
+          );
+        },
       ),
     );
   }
