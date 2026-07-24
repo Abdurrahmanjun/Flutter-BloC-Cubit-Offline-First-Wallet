@@ -18,8 +18,9 @@ class WalletLocalDataSource {
   Database? _db;
 
   /// Schema version. v2 split the stored balance into a server-confirmed
-  /// figure and a derived one — see [migrate].
-  static const schemaVersion = 2;
+  /// figure and a derived one; v3 replaced the `synced` bool with a three-way
+  /// status plus its retry bookkeeping — see [migrate].
+  static const schemaVersion = 3;
 
   Future<Database> get _database async {
     if (_testDb != null) return _testDb;
@@ -48,7 +49,16 @@ class WalletLocalDataSource {
     await db.execute('''
       CREATE TABLE txn(
         id TEXT PRIMARY KEY, counterparty TEXT, amount_cents INTEGER,
-        direction INTEGER, timestamp INTEGER, synced INTEGER)''');
+        direction INTEGER, timestamp INTEGER,
+        status INTEGER NOT NULL DEFAULT 0,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at INTEGER,
+        last_error TEXT,
+        reverses_id TEXT,
+        server_timestamp INTEGER)''');
+    // The outbox drain filters on status and orders by rowid; without this it
+    // is a full scan of the whole history on every sync tick.
+    await db.execute('CREATE INDEX idx_txn_status ON txn(status)');
   }
 
   /// Seeds a demo account so the app runs out of the box (clean-room fake data).
@@ -73,6 +83,20 @@ class WalletLocalDataSource {
         'ALTER TABLE account RENAME COLUMN balance_cents TO confirmed_balance_cents',
       );
     }
+
+    // v2 → v3: `synced` became a three-way status. The old bool's values
+    // already line up (0 = pending, 1 = synced), so existing rows carry over
+    // untouched and only the new payload columns need adding.
+    if (from < 3) {
+      await db.execute('ALTER TABLE txn RENAME COLUMN synced TO status');
+      await db.execute(
+          'ALTER TABLE txn ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE txn ADD COLUMN next_attempt_at INTEGER');
+      await db.execute('ALTER TABLE txn ADD COLUMN last_error TEXT');
+      await db.execute('ALTER TABLE txn ADD COLUMN reverses_id TEXT');
+      await db.execute('ALTER TABLE txn ADD COLUMN server_timestamp INTEGER');
+      await db.execute('CREATE INDEX idx_txn_status ON txn(status)');
+    }
   }
 
   Future<AccountModel?> getAccount() async {
@@ -94,6 +118,12 @@ class WalletLocalDataSource {
     return rows.map(TransactionModel.fromMap).toList();
   }
 
+  /// Overwrites a row with the given status and payload.
+  Future<void> updateTransaction(TransactionModel tx) async {
+    final db = await _database;
+    await db.update('txn', tx.toMap(), where: 'id = ?', whereArgs: [tx.id]);
+  }
+
   Future<void> insertTransaction(TransactionModel tx) async {
     final db = await _database;
     await db.insert('txn', tx.toMap(),
@@ -111,7 +141,9 @@ class WalletLocalDataSource {
   Future<List<TransactionModel>> pendingTransactions() async {
     final db = await _database;
     final rows = await db.query('txn',
-        where: 'synced = 0', orderBy: 'rowid ASC');
+        where: 'status = ?',
+        whereArgs: [TxStatusCode.pending],
+        orderBy: 'rowid ASC');
     return rows.map(TransactionModel.fromMap).toList();
   }
 
@@ -125,8 +157,8 @@ class WalletLocalDataSource {
     final db = await _database;
     final rows = await db.rawQuery(
       'SELECT COALESCE(SUM(amount_cents), 0) AS total '
-      'FROM txn WHERE synced = 0 AND direction = ?',
-      [direction.index],
+      'FROM txn WHERE status = ? AND direction = ?',
+      [TxStatusCode.pending, direction.index],
     );
     return (rows.first['total'] as int?) ?? 0;
   }
@@ -138,11 +170,23 @@ class WalletLocalDataSource {
   Future<void> confirmTransfer({
     required String txId,
     required int confirmedBalanceCents,
+    DateTime? serverTime,
   }) async {
     final db = await _database;
     await db.transaction((txn) async {
-      await txn.update('txn', {'synced': 1},
-          where: 'id = ?', whereArgs: [txId]);
+      await txn.update(
+        'txn',
+        {
+          'status': TxStatusCode.synced,
+          'server_timestamp': serverTime?.millisecondsSinceEpoch,
+          // Retry bookkeeping is dead once confirmed; leaving it would make a
+          // synced row look like it were mid-backoff.
+          'attempts': 0,
+          'next_attempt_at': null,
+        },
+        where: 'id = ?',
+        whereArgs: [txId],
+      );
       await txn.update(
           'account', {'confirmed_balance_cents': confirmedBalanceCents});
     });

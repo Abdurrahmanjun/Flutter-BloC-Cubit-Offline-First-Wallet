@@ -157,10 +157,15 @@ void main() {
 
   test('v1 → v2 migration preserves the balance under its new meaning',
       () async {
+    // The complete v1 schema, so the whole v1 → current path runs.
     final old = await freshDb();
     await old.execute('''
       CREATE TABLE account(
         id TEXT PRIMARY KEY, holder_name TEXT, balance_cents INTEGER, currency TEXT)''');
+    await old.execute('''
+      CREATE TABLE txn(
+        id TEXT PRIMARY KEY, counterparty TEXT, amount_cents INTEGER,
+        direction INTEGER, timestamp INTEGER, synced INTEGER)''');
     await old.insert('account', {
       'id': 'acc_demo',
       'holder_name': 'Jamie Carter',

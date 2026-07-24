@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/transaction.dart';
+import '../../domain/entities/tx_status.dart';
 import '../widgets/money_text.dart';
 
 class TransactionTile extends StatelessWidget {
@@ -12,8 +13,27 @@ class TransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final debit = tx.direction == TxDirection.debit;
-    // Unsynced transfers are queued offline — the core offline-first cue.
-    final queued = !tx.synced;
+
+    // Exhaustive over TxStatus: a fourth state would fail to compile here
+    // rather than quietly rendering as an ordinary settled transfer.
+    final (badge, caption, captionColor) = switch (tx.status) {
+      Pending() => (
+          'Queued',
+          'Queued · syncs when you reconnect',
+          t.accent,
+        ),
+      Rejected(:final reason) => (
+          'Failed',
+          reason,
+          t.danger,
+        ),
+      Synced() => (
+          null,
+          DateFormat('MMM d, y · h:mm a').format(tx.displayTime),
+          t.textMuted,
+        ),
+    };
+    final rejected = tx.status is Rejected;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -52,23 +72,22 @@ class TransactionTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (queued) ...[
+                    if (badge != null) ...[
                       const SizedBox(width: 8),
-                      _QueuedBadge(),
+                      _StatusBadge(label: badge, color: captionColor),
                     ],
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  queued
-                      ? 'Queued · syncs when you reconnect'
-                      : DateFormat('MMM d, y · h:mm a').format(tx.timestamp),
+                  caption,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    color: queued ? t.accent : t.textMuted,
-                    fontWeight: queued ? FontWeight.w600 : FontWeight.w400,
+                    color: captionColor,
+                    fontWeight:
+                        badge == null ? FontWeight.w400 : FontWeight.w600,
                   ),
                 ),
               ],
@@ -80,7 +99,14 @@ class TransactionTile extends StatelessWidget {
             style: context.numeric(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: debit ? t.textPrimary : t.success,
+              // A rejected transfer never moved money, so it is struck through
+              // rather than shown as a real debit sitting in the history.
+              color: rejected
+                  ? t.textFaint
+                  : (debit ? t.textPrimary : t.success),
+            ).copyWith(
+              decoration: rejected ? TextDecoration.lineThrough : null,
+              decorationColor: rejected ? t.textFaint : null,
             ),
           ),
         ],
@@ -97,22 +123,25 @@ class TransactionTile extends StatelessWidget {
   }
 }
 
-class _QueuedBadge extends StatelessWidget {
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label, required this.color});
+  final String label;
+  final Color color;
+
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: t.accentSoft,
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(WalletTokens.rPill),
       ),
       child: Text(
-        'Queued',
+        label,
         style: TextStyle(
           fontSize: 10.5,
           fontWeight: FontWeight.w700,
-          color: t.accent,
+          color: color,
         ),
       ),
     );

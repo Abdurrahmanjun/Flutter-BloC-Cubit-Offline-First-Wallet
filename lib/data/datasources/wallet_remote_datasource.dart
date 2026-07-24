@@ -42,7 +42,11 @@ class WalletRemoteDataSource {
     if (seen != null) return seen;
 
     _balanceCents -= amountCents;
-    final ack = TransferAck(id: idempotencyKey, balanceCents: _balanceCents);
+    final ack = TransferAck(
+      id: idempotencyKey,
+      balanceCents: _balanceCents,
+      serverTime: DateTime.now(),
+    );
     _applied[idempotencyKey] = ack;
     return ack;
   }

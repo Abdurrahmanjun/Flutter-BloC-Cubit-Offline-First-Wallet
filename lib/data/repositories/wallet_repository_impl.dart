@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import '../../core/error/failures.dart';
 import '../../domain/entities/account_view.dart';
 import '../../domain/entities/transaction.dart';
+import '../../domain/entities/tx_status.dart';
 import '../../domain/repositories/wallet_repository.dart';
 import '../datasources/wallet_local_datasource.dart';
 import '../datasources/wallet_remote_datasource.dart';
@@ -82,7 +83,7 @@ class WalletRepositoryImpl implements WalletRepository {
         amountCents: amountCents,
         direction: TxDirection.debit,
         timestamp: DateTime.now(),
-        synced: false,
+        status: const Pending(),
       );
 
       // Write locally first (offline-first): the transfer is durable even if
@@ -101,6 +102,7 @@ class WalletRepositoryImpl implements WalletRepository {
         await local.confirmTransfer(
           txId: tx.id,
           confirmedBalanceCents: ack.balanceCents,
+          serverTime: ack.serverTime,
         );
       } catch (_) {
         // Stays in the outbox for a later retry. Still a success locally —
