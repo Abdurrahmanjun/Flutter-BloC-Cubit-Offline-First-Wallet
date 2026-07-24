@@ -186,6 +186,14 @@ class AppTheme {
       scaffoldBackgroundColor: t.screenBackground,
       textTheme: textTheme,
       extensions: [t],
+      // Drive Flutter routes with the Android 14+ predictive-back animation, so
+      // the system back-swipe peeks the previous screen (needs the
+      // enableOnBackInvokedCallback flag in AndroidManifest.xml).
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: t.screenBackground,
         surfaceTintColor: Colors.transparent,

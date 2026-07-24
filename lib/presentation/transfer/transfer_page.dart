@@ -53,23 +53,27 @@ class _TransferPageState extends State<TransferPage> {
       create: (_) => sl<TransferBloc>(),
       child: BlocConsumer<TransferBloc, TransferState>(
         listener: (context, state) {
-          if (state.status == TransferStatus.success) {
-            // Replace Send with Success; its "Done" returns to Home.
-            Navigator.of(context).pushReplacement(
-              fadeSlideRoute<void>(
-                SuccessPage(
-                  amountCents: (_amount * 100).round(),
-                  recipient: _toController.text.trim(),
+          switch (state) {
+            case TransferSucceeded():
+              // Replace Send with Success; its "Done" returns to Home.
+              Navigator.of(context).pushReplacement(
+                fadeSlideRoute<void>(
+                  SuccessPage(
+                    amountCents: (_amount * 100).round(),
+                    recipient: _toController.text.trim(),
+                  ),
                 ),
-              ),
-            );
-          } else if (state.status == TransferStatus.failure) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(state.message)));
+              );
+            case TransferFailed(:final message):
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(message)));
+            case TransferIdle():
+            case TransferInProgress():
+              break;
           }
         },
         builder: (context, state) {
-          final submitting = state.status == TransferStatus.submitting;
+          final submitting = state is TransferInProgress;
           return Scaffold(
             appBar: AppBar(
               leading: IconButton(

@@ -34,8 +34,8 @@ void main() {
     act: (bloc) => bloc.add(
         const TransferSubmitted(toCounterparty: 'Alice', amountCents: 1000)),
     expect: () => [
-      const TransferState(status: TransferStatus.submitting),
-      const TransferState(status: TransferStatus.success, message: 'Sent'),
+      const TransferInProgress(),
+      const TransferSucceeded(),
     ],
   );
 
@@ -52,9 +52,8 @@ void main() {
     act: (bloc) => bloc.add(
         const TransferSubmitted(toCounterparty: 'Bob', amountCents: 999999)),
     expect: () => [
-      const TransferState(status: TransferStatus.submitting),
-      const TransferState(
-          status: TransferStatus.failure, message: 'Insufficient balance'),
+      const TransferInProgress(),
+      const TransferFailed('Insufficient balance'),
     ],
   );
 

@@ -11,7 +11,7 @@ part 'transfer_state.dart';
 /// CANNOT fire two transfers while the first is in flight. This is exactly
 /// the kind of guarantee a fintech reviewer looks for.
 class TransferBloc extends Bloc<TransferEvent, TransferState> {
-  TransferBloc(this._makeTransfer) : super(const TransferState()) {
+  TransferBloc(this._makeTransfer) : super(const TransferIdle()) {
     on<TransferSubmitted>(_onSubmitted, transformer: droppable());
   }
 
@@ -19,14 +19,14 @@ class TransferBloc extends Bloc<TransferEvent, TransferState> {
 
   Future<void> _onSubmitted(
       TransferSubmitted event, Emitter<TransferState> emit) async {
-    emit(state.copyWith(status: TransferStatus.submitting));
+    emit(const TransferInProgress());
     final result = await _makeTransfer(
       toCounterparty: event.toCounterparty,
       amountCents: event.amountCents,
     );
-    result.fold(
-      (f) => emit(state.copyWith(status: TransferStatus.failure, message: f.message)),
-      (_) => emit(state.copyWith(status: TransferStatus.success, message: 'Sent')),
-    );
+    emit(result.fold(
+      (f) => TransferFailed(f.message),
+      (_) => const TransferSucceeded(),
+    ));
   }
 }

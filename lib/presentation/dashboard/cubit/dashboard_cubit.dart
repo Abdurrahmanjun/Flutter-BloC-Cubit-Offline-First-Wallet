@@ -13,26 +13,22 @@ class DashboardCubit extends Cubit<DashboardState> {
     required GetTransactions getTransactions,
   })  : _getAccount = getAccount,
         _getTransactions = getTransactions,
-        super(const DashboardState());
+        super(const DashboardInitial());
 
   final GetAccount _getAccount;
   final GetTransactions _getTransactions;
 
   Future<void> load() async {
-    emit(state.copyWith(status: DashboardStatus.loading));
+    emit(const DashboardLoading());
     final accResult = await _getAccount();
     final txResult = await _getTransactions();
 
-    accResult.fold(
-      (f) => emit(state.copyWith(status: DashboardStatus.error, message: f.message)),
+    emit(accResult.fold(
+      (f) => DashboardError(f.message),
       (account) => txResult.fold(
-        (f) => emit(state.copyWith(status: DashboardStatus.error, message: f.message)),
-        (txs) => emit(state.copyWith(
-          status: DashboardStatus.loaded,
-          account: account,
-          transactions: txs,
-        )),
+        (f) => DashboardError(f.message),
+        (txs) => DashboardLoaded(account: account, transactions: txs),
       ),
-    );
+    ));
   }
 }

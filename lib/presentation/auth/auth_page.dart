@@ -38,21 +38,21 @@ class _AuthPageState extends State<AuthPage> with TickerProviderStateMixin {
     final t = context.tokens;
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {
-        final busy = state.status == AuthStatus.authenticating;
+        final busy = state is AuthAuthenticating;
         if (busy) {
           _spin.repeat();
         } else {
           _spin.stop();
           _spin.value = 0;
         }
-        if (state.status == AuthStatus.unlocked) {
+        if (state is AuthUnlocked) {
           Navigator.of(context).pushReplacement(
             fadeSlideRoute(const DashboardPage()),
           );
         }
       },
       builder: (context, state) {
-        final busy = state.status == AuthStatus.authenticating;
+        final busy = state is AuthAuthenticating;
         return Scaffold(
           body: SafeArea(
             child: Padding(

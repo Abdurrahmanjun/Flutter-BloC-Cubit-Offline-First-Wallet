@@ -22,23 +22,19 @@ class DashboardPage extends StatelessWidget {
         builder: (context) => Scaffold(
           body: SafeArea(
             child: BlocBuilder<DashboardCubit, DashboardState>(
-              builder: (context, state) {
-                if (state.status == DashboardStatus.loading ||
-                    state.status == DashboardStatus.initial) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (state.status == DashboardStatus.error) {
-                  return Center(child: Text(state.message));
-                }
-                final acc = state.account!;
-                return RefreshIndicator(
+              builder: (context, state) => switch (state) {
+                DashboardInitial() || DashboardLoading() =>
+                  const Center(child: CircularProgressIndicator()),
+                DashboardError(:final message) => Center(child: Text(message)),
+                DashboardLoaded(:final account, :final transactions) =>
+                  RefreshIndicator(
                   onRefresh: () => context.read<DashboardCubit>().load(),
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                     children: [
-                      _TopBar(name: acc.holderName),
+                      _TopBar(name: account.holderName),
                       const SizedBox(height: 22),
-                      _BalanceCard(account: acc),
+                      _BalanceCard(account: account),
                       const SizedBox(height: 20),
                       _QuickActions(
                         onSend: () async {
@@ -73,7 +69,7 @@ class DashboardPage extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      if (state.transactions.isEmpty)
+                      if (transactions.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 28),
                           child: Center(
@@ -84,11 +80,10 @@ class DashboardPage extends StatelessWidget {
                           ),
                         )
                       else
-                        ...state.transactions
-                            .map((t) => TransactionTile(tx: t)),
+                        ...transactions.map((t) => TransactionTile(tx: t)),
                     ],
                   ),
-                );
+                ),
               },
             ),
           ),
