@@ -1,8 +1,8 @@
 # 💳 Offline-First Wallet — Flutter + Native Android Biometrics
 
-A clean-architecture mobile wallet demonstrating **offline-first data**, **safe money movement**, and a **hand-written Flutter↔Kotlin biometric bridge**
+A clean-architecture mobile wallet with a **working offline sync engine** — durable local writes, an **idempotent outbox**, and **reconciliation that survives a lost network reply** — plus a **hand-written Flutter↔Kotlin biometric bridge**
 
-> **Why this repo is different:** most Flutter wallet demos stop at the UI. This one crosses the native boundary (a custom `MethodChannel` to Android `BiometricPrompt`, no `local_auth` plugin) and treats money with the correctness a bank expects (integer cents, atomic DB writes, double-spend protection).
+> **Why this repo is different:** most Flutter wallet demos write to a local DB, set a `synced = false` flag, and stop — nothing ever reads that flag back, so "syncs when you reconnect" is a label rather than a behaviour. This one finishes the job: an ordered outbox with persisted jittered backoff, client-generated idempotency keys, id-based reconciliation, and a reference backend to prove the contract across a real process boundary. It also crosses the native boundary (a custom `MethodChannel` to Android `BiometricPrompt`, no `local_auth` plugin) and treats money with the correctness a bank expects — integer cents, atomic DB writes, and a balance that is derived rather than stored.
 
 ---
 

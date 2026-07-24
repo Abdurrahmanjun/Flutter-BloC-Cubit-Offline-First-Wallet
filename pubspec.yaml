@@ -1,5 +1,8 @@
 name: offline_first_wallet
-description: Offline-first mobile wallet — Flutter clean architecture with a hand-written Flutter↔Kotlin biometric channel.
+description: >-
+  Offline-first mobile wallet — Flutter clean architecture with an idempotent
+  outbox sync engine, id-based reconciliation, and a hand-written
+  Flutter↔Kotlin biometric channel.
 publish_to: "none"
 version: 1.0.0+1
 
