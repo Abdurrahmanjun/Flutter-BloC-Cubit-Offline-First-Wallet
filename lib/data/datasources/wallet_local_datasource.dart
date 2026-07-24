@@ -169,6 +169,53 @@ class WalletLocalDataSource {
     return rows.map(TransactionModel.fromMap).toList();
   }
 
+  Future<int> pendingCount() async {
+    final db = await _database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM txn WHERE status = ?',
+      [TxStatusCode.pending],
+    );
+    return (rows.first['c'] as int?) ?? 0;
+  }
+
+  /// Clears the backoff on every queued row so they are all due immediately.
+  ///
+  /// Only for an explicit "try again now" from the user — an automatic caller
+  /// would defeat the backoff entirely.
+  Future<void> resetRetries() async {
+    final db = await _database;
+    await db.update(
+      'txn',
+      {'attempts': 0, 'next_attempt_at': null},
+      where: 'status = ?',
+      whereArgs: [TxStatusCode.pending],
+    );
+  }
+
+  /// Records a failed attempt and when the next one is allowed.
+  ///
+  /// This lives on the row rather than in the worker's memory on purpose: an
+  /// in-memory backoff resets on every cold start, so a user reopening the app
+  /// would hammer a server that is already struggling.
+  Future<void> scheduleRetry({
+    required String txId,
+    required int attempts,
+    required DateTime nextAttemptAt,
+    String? lastError,
+  }) async {
+    final db = await _database;
+    await db.update(
+      'txn',
+      {
+        'attempts': attempts,
+        'next_attempt_at': nextAttemptAt.millisecondsSinceEpoch,
+        'last_error': lastError,
+      },
+      where: 'id = ?',
+      whereArgs: [txId],
+    );
+  }
+
   Future<int> pendingOutCents() =>
       _pendingSum(TxDirection.debit);
 
