@@ -28,7 +28,7 @@ class DashboardPage extends StatelessWidget {
                 DashboardError(:final message) => Center(child: Text(message)),
                 DashboardLoaded(:final account, :final transactions) =>
                   RefreshIndicator(
-                  onRefresh: () => context.read<DashboardCubit>().load(),
+                  onRefresh: () => context.read<DashboardCubit>().refresh(),
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                     children: [

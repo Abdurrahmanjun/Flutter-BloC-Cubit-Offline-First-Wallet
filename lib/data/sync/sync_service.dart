@@ -91,10 +91,14 @@ class SyncService {
         if (pending is! Pending) continue;
 
         if (pending.attempts >= _backoff.maxAttempts) {
-          // Deliberately NOT reversed. After a string of transient failures we
-          // genuinely do not know whether the server applied it — a dropped
-          // reply looks exactly like a dropped request. Reversing could give
-          // back money that really moved, so this waits for a human.
+          // Out of retries, but "no reply" and "no delivery" look identical
+          // from here. Before involving a human, ask the server whether it
+          // actually has this transfer — its ledger settles the question that
+          // retrying never could.
+          if ((await _tryReconcile()).contains(tx.id)) continue;
+
+          // Still unknown. Deliberately NOT reversed: the transfer may really
+          // have been applied, and giving the money back would invent it.
           return _park(
             'Could not reach the server after ${pending.attempts} attempts',
             blockedTxId: tx.id,
@@ -150,6 +154,22 @@ class SyncService {
     await _local.resetRetries();
     _parked = false;
     await sync();
+  }
+
+  /// Asks the server what it actually has and folds it in. Returns the ids
+  /// that turned out to be settled. A failure here is not fatal — it just
+  /// means the question stays open.
+  Future<Set<String>> _tryReconcile() async {
+    try {
+      final ledger = await _remote.fetchTransactions();
+      final account = await _remote.fetchAccount();
+      return await _local.reconcile(
+        serverTransactions: ledger,
+        account: account,
+      );
+    } on WalletException {
+      return const {};
+    }
   }
 
   Future<void> _backOff(String txId, Pending pending, String error) async {

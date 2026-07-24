@@ -1,8 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import '../models/account_model.dart';
+import '../models/remote_transaction.dart';
 import '../models/transaction_model.dart';
 import '../../domain/entities/transaction.dart';
+import '../../domain/entities/tx_status.dart';
 
 /// The local DB is the SINGLE SOURCE OF TRUTH (offline-first).
 /// The UI always reads from here; the network only refreshes it.
@@ -116,6 +118,73 @@ class WalletLocalDataSource {
     // Display order. Queue order is `rowid ASC` — see [pendingTransactions].
     final rows = await db.query('txn', orderBy: 'timestamp DESC');
     return rows.map(TransactionModel.fromMap).toList();
+  }
+
+  /// Folds a server snapshot into the local database in one transaction.
+  ///
+  /// The order inside matters and is the whole point of this method:
+  /// **promote first, write the balance second.** The server's balance already
+  /// excludes everything it has applied, so if a local row is still marked
+  /// pending while that balance lands, the derived figure subtracts the same
+  /// transfer twice and the user is shown less money than they have.
+  ///
+  /// Promotion is by **id**, never by arithmetic. Any local row the server
+  /// knows about is settled — including one this device gave up on, since the
+  /// server's ledger is the authority on what actually happened.
+  ///
+  /// Returns the ids that changed state.
+  Future<Set<String>> reconcile({
+    required List<RemoteTransaction> serverTransactions,
+    required AccountModel account,
+  }) async {
+    final db = await _database;
+    final promoted = <String>{};
+
+    await db.transaction((txn) async {
+      for (final remote in serverTransactions) {
+        final changed = await txn.update(
+          'txn',
+          {
+            'status': TxStatusCode.synced,
+            'server_timestamp': remote.serverTime.millisecondsSinceEpoch,
+            'attempts': 0,
+            'next_attempt_at': null,
+            'last_error': null,
+          },
+          where: 'id = ? AND status != ?',
+          whereArgs: [remote.id, TxStatusCode.synced],
+        );
+        if (changed > 0) {
+          promoted.add(remote.id);
+          continue;
+        }
+
+        // Never seen locally — a transfer made on another device. Insert it so
+        // the history is complete; it is already inside the server balance, so
+        // it must land as settled and not as an outbox row.
+        final existing = await txn.query('txn',
+            columns: ['id'], where: 'id = ?', whereArgs: [remote.id], limit: 1);
+        if (existing.isEmpty) {
+          await txn.insert(
+            'txn',
+            TransactionModel(
+              id: remote.id,
+              counterparty: remote.counterparty,
+              amountCents: remote.amountCents,
+              direction: remote.direction,
+              timestamp: remote.serverTime,
+              status: Synced(serverTime: remote.serverTime),
+            ).toMap(),
+          );
+          promoted.add(remote.id);
+        }
+      }
+
+      await txn.insert('account', account.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+
+    return promoted;
   }
 
   /// The server refused [txId] outright. No balance write is needed: a

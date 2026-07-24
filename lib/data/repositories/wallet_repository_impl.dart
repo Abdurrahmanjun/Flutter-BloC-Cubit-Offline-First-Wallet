@@ -50,6 +50,34 @@ class WalletRepositoryImpl implements WalletRepository {
   }
 
   @override
+  Future<Either<Failure, AccountView>> refresh() async {
+    try {
+      // Ledger first, balance second. If a transfer lands between the two
+      // calls it will be inside the balance but missing from the ledger, so
+      // the client keeps counting it as pending and shows slightly LESS money
+      // than it has — which self-corrects on the next refresh. The opposite
+      // order would show more money than exists, and could let the user
+      // overdraw. A single combined endpoint would remove the choice.
+      final ledger = await remote.fetchTransactions();
+      final account = await remote.fetchAccount();
+
+      await local.reconcile(
+        serverTransactions: ledger,
+        account: account,
+      );
+      return Right(await _currentView());
+    } on AuthExpiredException catch (e) {
+      return Left(AuthExpiredFailure(e.message));
+    } on WalletException catch (e) {
+      // Offline is not an error here — the cached view is still valid, that is
+      // the point of the local DB being the source of truth.
+      return Left(NetworkFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('Could not refresh'));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<WalletTransaction>>> getTransactions() async {
     try {
       return Right(await local.getTransactions());

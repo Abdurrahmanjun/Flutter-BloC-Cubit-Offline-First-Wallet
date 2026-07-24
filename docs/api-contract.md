@@ -92,3 +92,15 @@ had already applied and show a balance that is too low.
 
 This is why transaction ids are generated on the client: the same value is the
 idempotency key on write and the reconciliation key on read.
+
+### Fetch these two together if you can
+
+`GET /transactions` and `GET /account` are separate calls, so a transfer can
+land between them. The client fetches the **ledger first, balance second**: a
+transfer that slips in between is then inside the balance but missing from the
+ledger, so the client keeps treating it as pending and shows slightly *less*
+money than there is — self-correcting on the next refresh. The other order
+shows more money than exists and can let the user overdraw.
+
+A combined snapshot endpoint would remove the choice entirely, and is the
+recommended shape for a real implementation.

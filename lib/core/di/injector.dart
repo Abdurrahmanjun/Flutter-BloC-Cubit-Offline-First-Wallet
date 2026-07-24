@@ -9,6 +9,7 @@ import '../../domain/repositories/wallet_repository.dart';
 import '../../domain/usecases/get_account.dart';
 import '../../domain/usecases/get_transactions.dart';
 import '../../domain/usecases/make_transfer.dart';
+import '../../domain/usecases/refresh_wallet.dart';
 import '../../presentation/auth/cubit/auth_cubit.dart';
 import '../../presentation/dashboard/cubit/dashboard_cubit.dart';
 import '../../presentation/transfer/bloc/transfer_bloc.dart';
@@ -46,9 +47,14 @@ Future<void> initInjector() async {
   sl.registerLazySingleton(() => GetAccount(sl()));
   sl.registerLazySingleton(() => GetTransactions(sl()));
   sl.registerLazySingleton(() => MakeTransfer(sl()));
+  sl.registerLazySingleton(() => RefreshWallet(sl()));
 
   // Blocs / Cubits (factory: fresh instance per screen)
   sl.registerFactory(() => AuthCubit(sl()));
-  sl.registerFactory(() => DashboardCubit(getAccount: sl(), getTransactions: sl()));
+  sl.registerFactory(() => DashboardCubit(
+        getAccount: sl(),
+        getTransactions: sl(),
+        refreshWallet: sl(),
+      ));
   sl.registerFactory(() => TransferBloc(sl()));
 }
