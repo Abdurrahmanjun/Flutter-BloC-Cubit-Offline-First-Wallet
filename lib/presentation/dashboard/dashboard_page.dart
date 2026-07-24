@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/di/injector.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
-import '../../domain/entities/account.dart';
+import '../../domain/entities/account_view.dart';
 import '../history/transaction_tile.dart';
 import '../transfer/transfer_page.dart';
 import '../widgets/money_text.dart';
@@ -185,7 +185,7 @@ class _ThemeToggle extends StatelessWidget {
 
 class _BalanceCard extends StatelessWidget {
   const _BalanceCard({required this.account});
-  final Account account;
+  final AccountView account;
 
   @override
   Widget build(BuildContext context) {
@@ -239,7 +239,9 @@ class _BalanceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   MoneyText(
-                    account.balanceCents,
+                    // Derived, not stored: confirmed − queued. Holds steady
+                    // when a queued transfer syncs.
+                    account.availableCents,
                     currency: account.currency,
                     style: context.numeric(
                       fontSize: 44,

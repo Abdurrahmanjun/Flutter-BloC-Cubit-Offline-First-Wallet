@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../domain/entities/account.dart';
+import '../../../domain/entities/account_view.dart';
 import '../../../domain/entities/transaction.dart';
 import '../../../domain/usecases/get_account.dart';
 import '../../../domain/usecases/get_transactions.dart';

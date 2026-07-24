@@ -14,3 +14,6 @@ ios/Pods/
 # FVM — pin config (.fvmrc) is committed, downloaded SDK is not
 .fvm/versions/
 .fvm/flutter_sdk
+
+# Working notes — local only
+docs/offline-first-plan.md

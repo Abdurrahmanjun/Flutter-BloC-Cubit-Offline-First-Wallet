@@ -1,11 +1,10 @@
 import 'package:dartz/dartz.dart';
 import '../../core/error/failures.dart';
-import '../../domain/entities/account.dart';
+import '../../domain/entities/account_view.dart';
 import '../../domain/entities/transaction.dart';
 import '../../domain/repositories/wallet_repository.dart';
 import '../datasources/wallet_local_datasource.dart';
 import '../datasources/wallet_remote_datasource.dart';
-import '../models/account_model.dart';
 import '../models/transaction_model.dart';
 
 class WalletRepositoryImpl implements WalletRepository {
@@ -19,20 +18,33 @@ class WalletRepositoryImpl implements WalletRepository {
   final WalletRemoteDataSource remote;
   final String Function()? uuid;
 
+  /// Client-generated, and deliberately so: this id doubles as the server's
+  /// idempotency key, so a retry after an ambiguous timeout cannot double-spend.
   String _id() =>
       uuid?.call() ?? 'tx_${DateTime.now().microsecondsSinceEpoch}';
 
   @override
-  Future<Either<Failure, Account>> getAccount() async {
+  Future<Either<Failure, AccountView>> getAccount() async {
     try {
-      final cached = await local.getAccount();
-      if (cached != null) return Right(cached);
-      final remoteAcc = await remote.fetchAccount();
-      await local.upsertAccount(remoteAcc);
-      return Right(remoteAcc);
+      return Right(await _currentView());
     } catch (_) {
       return const Left(CacheFailure('Could not load account'));
     }
+  }
+
+  /// Confirmed balance + outbox, combined. The derivation lives in
+  /// [AccountView]; this just gathers the three numbers it needs.
+  Future<AccountView> _currentView() async {
+    var account = await local.getAccount();
+    if (account == null) {
+      account = await remote.fetchAccount();
+      await local.upsertAccount(account);
+    }
+    return AccountView(
+      account: account,
+      pendingOutCents: await local.pendingOutCents(),
+      pendingInCents: await local.pendingInCents(),
+    );
   }
 
   @override
@@ -50,9 +62,17 @@ class WalletRepositoryImpl implements WalletRepository {
     required int amountCents,
   }) async {
     try {
-      final account = await local.getAccount();
-      if (account == null) return const Left(CacheFailure('No account'));
-      if (account.balanceCents < amountCents) {
+      final view = await _currentView();
+
+      // Checked against the DERIVED figure, not the confirmed one — otherwise
+      // three offline transfers would each pass against the same untouched
+      // balance and the user could overdraw while disconnected.
+      //
+      // This is optimistic, not authoritative: the confirmed balance can be
+      // stale (money spent on another device), so the server can still reject
+      // a transfer that passed here. Rejection has to be handled on the way
+      // back, not prevented on the way out.
+      if (view.availableCents < amountCents) {
         return const Left(TransferFailure('Insufficient balance'));
       }
 
@@ -64,30 +84,27 @@ class WalletRepositoryImpl implements WalletRepository {
         timestamp: DateTime.now(),
         synced: false,
       );
-      final updated = AccountModel(
-        id: account.id,
-        holderName: account.holderName,
-        balanceCents: account.balanceCents - amountCents,
-        currency: account.currency,
-      );
 
-      // Write locally first (offline-first): the transfer is durable even if the
-      // network call fails; a background sync would reconcile `synced=false` rows.
-      await local.applyTransfer(updated, tx);
+      // Write locally first (offline-first): the transfer is durable even if
+      // the network call fails. The account row is untouched — the debit is
+      // visible through the pending sum until the server confirms it.
+      await local.enqueueTransfer(tx);
 
       try {
-        await remote.pushTransfer(
-            toCounterparty: toCounterparty, amountCents: amountCents);
-        await local.insertTransaction(TransactionModel(
-          id: tx.id,
-          counterparty: tx.counterparty,
-          amountCents: tx.amountCents,
-          direction: tx.direction,
-          timestamp: tx.timestamp,
-          synced: true,
-        ));
+        final ack = await remote.pushTransfer(
+          idempotencyKey: tx.id,
+          toCounterparty: toCounterparty,
+          amountCents: amountCents,
+        );
+        // Leaves the pending set and enters the confirmed balance together,
+        // so the derived figure does not move. That is the no-flicker property.
+        await local.confirmTransfer(
+          txId: tx.id,
+          confirmedBalanceCents: ack.balanceCents,
+        );
       } catch (_) {
-        // Stays synced=false for later reconciliation. Still a success locally.
+        // Stays in the outbox for a later retry. Still a success locally —
+        // the user's money moved the moment it hit the local DB.
       }
       return Right(tx);
     } catch (_) {

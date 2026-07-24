@@ -21,7 +21,9 @@ class DashboardLoading extends DashboardState {
 /// Loaded — [account] and [transactions] are guaranteed present.
 class DashboardLoaded extends DashboardState {
   const DashboardLoaded({required this.account, required this.transactions});
-  final Account account;
+
+  /// Carries the derived spendable balance, not the raw stored one.
+  final AccountView account;
   final List<WalletTransaction> transactions;
   @override
   List<Object?> get props => [account, transactions];
