@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get_it/get_it.dart';
 import '../platform/biometric_authenticator.dart';
 import '../../data/datasources/wallet_local_datasource.dart';
+import '../../data/datasources/fake_wallet_remote_datasource.dart';
 import '../../data/datasources/wallet_remote_datasource.dart';
 import '../../data/repositories/wallet_repository_impl.dart';
 import '../../data/sync/sync_service.dart';
@@ -23,7 +24,11 @@ Future<void> initInjector() async {
 
   // Data sources
   sl.registerLazySingleton(WalletLocalDataSource.new);
-  sl.registerLazySingleton(WalletRemoteDataSource.new);
+  // The app runs against the in-process fake so it works with nothing else
+  // installed. Point this at HttpWalletRemoteDataSource to drive the
+  // reference server in `server/` instead — nothing above this line changes.
+  sl.registerLazySingleton<WalletRemoteDataSource>(
+      FakeWalletRemoteDataSource.new);
 
   // Repository
   sl.registerLazySingleton<WalletRepository>(

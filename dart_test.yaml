@@ -1,0 +1,6 @@
+tags:
+  # Boots the reference server in server/ and talks to it over real HTTP.
+  # Skipped by default so `flutter test` needs nothing running; opt in with:
+  #   flutter test --tags integration --run-skipped
+  integration:
+    skip: "integration: run with --tags integration --run-skipped"

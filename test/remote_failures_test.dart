@@ -6,7 +6,7 @@ import 'package:offline_first_wallet/core/error/exceptions.dart';
 import 'package:offline_first_wallet/core/error/failures.dart';
 import 'package:offline_first_wallet/data/datasources/chaos_config.dart';
 import 'package:offline_first_wallet/data/datasources/wallet_local_datasource.dart';
-import 'package:offline_first_wallet/data/datasources/wallet_remote_datasource.dart';
+import 'package:offline_first_wallet/data/datasources/fake_wallet_remote_datasource.dart';
 import 'package:offline_first_wallet/data/repositories/wallet_repository_impl.dart';
 import 'package:offline_first_wallet/domain/entities/tx_status.dart';
 
@@ -18,7 +18,7 @@ void main() {
 
   late Database db;
   late WalletLocalDataSource local;
-  late WalletRemoteDataSource remote;
+  late FakeWalletRemoteDataSource remote;
   late WalletRepositoryImpl repo;
   var seq = 0;
 
@@ -33,7 +33,7 @@ void main() {
     await WalletLocalDataSource.createSchema(db);
     await WalletLocalDataSource.seedDemoAccount(db);
     local = WalletLocalDataSource(db);
-    remote = WalletRemoteDataSource(
+    remote = FakeWalletRemoteDataSource(
       chaos: chaos,
       initialBalanceCents: serverBalanceCents,
     );
@@ -174,7 +174,7 @@ void main() {
 
   test('failureRate is reproducible when the Random is seeded', () async {
     Future<List<String>> run() async {
-      final r = WalletRemoteDataSource(
+      final r = FakeWalletRemoteDataSource(
         chaos: const ChaosConfig(latency: Duration.zero, failureRate: 0.5),
         random: Random(42),
       );

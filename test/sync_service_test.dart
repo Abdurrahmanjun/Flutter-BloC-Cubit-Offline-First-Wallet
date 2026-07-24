@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:offline_first_wallet/data/datasources/chaos_config.dart';
 import 'package:offline_first_wallet/data/datasources/wallet_local_datasource.dart';
-import 'package:offline_first_wallet/data/datasources/wallet_remote_datasource.dart';
+import 'package:offline_first_wallet/data/datasources/fake_wallet_remote_datasource.dart';
 import 'package:offline_first_wallet/data/models/transaction_model.dart';
 import 'package:offline_first_wallet/data/repositories/wallet_repository_impl.dart';
 import 'package:offline_first_wallet/data/sync/backoff_policy.dart';
@@ -23,7 +23,7 @@ void main() {
 
   late Database db;
   late WalletLocalDataSource local;
-  late WalletRemoteDataSource remote;
+  late FakeWalletRemoteDataSource remote;
   late WalletRepositoryImpl repo;
   late SyncService sync;
 
@@ -45,7 +45,7 @@ void main() {
     await WalletLocalDataSource.createSchema(db);
     await WalletLocalDataSource.seedDemoAccount(db);
     local = WalletLocalDataSource(db);
-    remote = WalletRemoteDataSource(
+    remote = FakeWalletRemoteDataSource(
         chaos: chaos, initialBalanceCents: serverBalanceCents);
     seq = 0;
     repo = WalletRepositoryImpl(

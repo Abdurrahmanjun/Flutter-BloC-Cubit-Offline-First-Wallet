@@ -17,3 +17,7 @@ ios/Pods/
 
 # Working notes — local only
 docs/offline-first-plan.md
+
+# Reference server (its own Dart package)
+server/.dart_tool/
+server/pubspec.lock

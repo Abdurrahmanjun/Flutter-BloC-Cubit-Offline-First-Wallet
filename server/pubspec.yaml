@@ -1,0 +1,18 @@
+name: wallet_server
+description: >-
+  Reference wallet backend. In-memory, no database, no deployment — it exists
+  so the client's idempotency and reconciliation behaviour can be proven
+  across a real process boundary.
+publish_to: "none"
+version: 1.0.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+
+dev_dependencies:
+  lints: ^3.0.0
+  test: ^1.24.0
