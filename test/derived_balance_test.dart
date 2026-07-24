@@ -1,38 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:offline_first_wallet/core/error/exceptions.dart';
 import 'package:offline_first_wallet/core/error/failures.dart';
+import 'package:offline_first_wallet/data/datasources/chaos_config.dart';
 import 'package:offline_first_wallet/data/datasources/wallet_local_datasource.dart';
 import 'package:offline_first_wallet/data/datasources/wallet_remote_datasource.dart';
 import 'package:offline_first_wallet/data/models/account_model.dart';
-import 'package:offline_first_wallet/data/models/transfer_ack.dart';
 import 'package:offline_first_wallet/data/repositories/wallet_repository_impl.dart';
 
-/// A remote that can be taken offline mid-test — the minimum needed to reach
-/// the queued path.
-class _FakeRemote extends WalletRemoteDataSource {
-  bool offline = false;
-
-  @override
-  Future<AccountModel> fetchAccount() {
-    if (offline) throw const NetworkException();
-    return super.fetchAccount();
-  }
-
-  @override
-  Future<TransferAck> pushTransfer({
-    required String idempotencyKey,
-    required String toCounterparty,
-    required int amountCents,
-  }) {
-    if (offline) throw const NetworkException();
-    return super.pushTransfer(
-      idempotencyKey: idempotencyKey,
-      toCounterparty: toCounterparty,
-      amountCents: amountCents,
-    );
-  }
-}
+const _instant = ChaosConfig(latency: Duration.zero);
+const _offline = ChaosConfig(latency: Duration.zero, offline: true);
 
 void main() {
   sqfliteFfiInit();
@@ -40,7 +16,7 @@ void main() {
 
   late Database db;
   late WalletLocalDataSource local;
-  late _FakeRemote remote;
+  late WalletRemoteDataSource remote;
   late WalletRepositoryImpl repo;
   var seq = 0;
 
@@ -56,7 +32,7 @@ void main() {
     await WalletLocalDataSource.createSchema(db);
     await WalletLocalDataSource.seedDemoAccount(db);
     local = WalletLocalDataSource(db);
-    remote = _FakeRemote();
+    remote = WalletRemoteDataSource(chaos: _instant);
     seq = 0;
     repo = WalletRepositoryImpl(
       local: local,
@@ -88,14 +64,14 @@ void main() {
 
   test('THE no-flicker property: balance is identical before and after a '
       'queued transfer syncs', () async {
-    remote.offline = true;
+    remote.chaos = _offline;
     final result = await repo.transfer(toCounterparty: 'Alice', amountCents: 10000);
     expect(result.isRight(), isTrue, reason: 'offline transfer still succeeds locally');
 
     final whileQueued = await available();
     expect(whileQueued, 240000, reason: 'the debit shows immediately');
 
-    remote.offline = false;
+    remote.chaos = _instant;
     await drainOutbox();
 
     expect(await available(), whileQueued,
@@ -103,7 +79,7 @@ void main() {
   });
 
   test('a queued debit never touches the confirmed balance', () async {
-    remote.offline = true;
+    remote.chaos = _offline;
     await repo.transfer(toCounterparty: 'Alice', amountCents: 10000);
 
     final view = (await repo.getAccount()).getOrElse(() => throw 'no account');
@@ -115,7 +91,7 @@ void main() {
 
   test('cannot overdraw while offline: queued debits accumulate against the '
       'available figure', () async {
-    remote.offline = true;
+    remote.chaos = _offline;
     for (var i = 0; i < 2; i++) {
       final r = await repo.transfer(toCounterparty: 'Alice', amountCents: 100000);
       expect(r.isRight(), isTrue);

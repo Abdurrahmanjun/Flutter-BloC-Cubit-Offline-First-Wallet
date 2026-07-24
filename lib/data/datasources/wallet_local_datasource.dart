@@ -118,6 +118,28 @@ class WalletLocalDataSource {
     return rows.map(TransactionModel.fromMap).toList();
   }
 
+  /// The server refused [txId] outright. No balance write is needed: a
+  /// rejected row drops out of the pending sum, so the derived balance gives
+  /// the money back on its own. The compensating ledger entry is a separate
+  /// concern — this only records the verdict.
+  Future<void> markRejected({
+    required String txId,
+    required String reason,
+  }) async {
+    final db = await _database;
+    await db.update(
+      'txn',
+      {
+        'status': TxStatusCode.rejected,
+        'last_error': reason,
+        'attempts': 0,
+        'next_attempt_at': null,
+      },
+      where: 'id = ?',
+      whereArgs: [txId],
+    );
+  }
+
   /// Overwrites a row with the given status and payload.
   Future<void> updateTransaction(TransactionModel tx) async {
     final db = await _database;

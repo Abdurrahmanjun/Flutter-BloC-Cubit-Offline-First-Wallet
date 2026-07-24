@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import '../../core/error/exceptions.dart';
 import '../../core/error/failures.dart';
 import '../../domain/entities/account_view.dart';
 import '../../domain/entities/transaction.dart';
@@ -104,8 +105,20 @@ class WalletRepositoryImpl implements WalletRepository {
           confirmedBalanceCents: ack.balanceCents,
           serverTime: ack.serverTime,
         );
+      } on RejectedException catch (e) {
+        // Terminal. Retrying would fail identically forever, so the row is
+        // closed out now. The user is standing right here, so they are told —
+        // silently queueing a transfer that can never succeed would be worse.
+        await local.markRejected(txId: tx.id, reason: e.message);
+        return Left(RejectedFailure(e.message));
+      } on AuthExpiredException catch (e) {
+        // Stays queued, but backoff is the wrong response — this needs the
+        // user to re-authenticate before anything will get through.
+        return Left(AuthExpiredFailure(e.message));
       } catch (_) {
-        // Stays in the outbox for a later retry. Still a success locally —
+        // Transient, or the request may have landed and the reply was lost.
+        // Either way it stays in the outbox for a later retry, and the
+        // idempotency key makes that retry safe. Still a success locally —
         // the user's money moved the moment it hit the local DB.
       }
       return Right(tx);
