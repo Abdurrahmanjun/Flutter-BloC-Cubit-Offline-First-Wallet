@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:offline_first_wallet/core/error/failures.dart';
 import 'package:offline_first_wallet/domain/entities/transaction.dart';
+import 'package:offline_first_wallet/domain/entities/tx_status.dart';
 import 'package:offline_first_wallet/domain/usecases/make_transfer.dart';
 import 'package:offline_first_wallet/presentation/transfer/bloc/transfer_bloc.dart';
 
@@ -23,7 +24,24 @@ void main() {
   );
 
   blocTest<TransferBloc, TransferState>(
-    'emits [submitting, success] on a valid transfer',
+    'a transfer the server confirmed does not report itself as queued',
+    build: () {
+      when(() => makeTransfer(
+            toCounterparty: any(named: 'toCounterparty'),
+            amountCents: any(named: 'amountCents'),
+          )).thenAnswer((_) async => Right(tx.copyWith(status: const Synced())));
+      return TransferBloc(makeTransfer);
+    },
+    act: (bloc) => bloc.add(
+        const TransferSubmitted(toCounterparty: 'Alice', amountCents: 1000)),
+    expect: () => [
+      const TransferInProgress(),
+      const TransferSucceeded(queued: false),
+    ],
+  );
+
+  blocTest<TransferBloc, TransferState>(
+    'a transfer that only reached the outbox is still a success, but queued',
     build: () {
       when(() => makeTransfer(
             toCounterparty: any(named: 'toCounterparty'),
@@ -35,7 +53,7 @@ void main() {
         const TransferSubmitted(toCounterparty: 'Alice', amountCents: 1000)),
     expect: () => [
       const TransferInProgress(),
-      const TransferSucceeded(),
+      const TransferSucceeded(queued: true),
     ],
   );
 

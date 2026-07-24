@@ -1,10 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../core/di/injector.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../domain/entities/account_view.dart';
+import '../../domain/entities/sync_status.dart';
 import '../history/transaction_tile.dart';
 import '../transfer/transfer_page.dart';
 import '../widgets/money_text.dart';
@@ -26,7 +28,11 @@ class DashboardPage extends StatelessWidget {
                 DashboardInitial() || DashboardLoading() =>
                   const Center(child: CircularProgressIndicator()),
                 DashboardError(:final message) => Center(child: Text(message)),
-                DashboardLoaded(:final account, :final transactions) =>
+                DashboardLoaded(
+                  :final account,
+                  :final transactions,
+                  sync: final syncStatus
+                ) =>
                   RefreshIndicator(
                   onRefresh: () => context.read<DashboardCubit>().refresh(),
                   child: ListView(
@@ -34,7 +40,11 @@ class DashboardPage extends StatelessWidget {
                     children: [
                       _TopBar(name: account.holderName),
                       const SizedBox(height: 22),
-                      _BalanceCard(account: account),
+                      _BalanceCard(account: account, sync: syncStatus),
+                      if (syncStatus case final SyncParked parked) ...[
+                        const SizedBox(height: 12),
+                        _ParkedBanner(parked: parked),
+                      ],
                       const SizedBox(height: 20),
                       _QuickActions(
                         onSend: () async {
@@ -184,8 +194,9 @@ class _ThemeToggle extends StatelessWidget {
 }
 
 class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({required this.account});
+  const _BalanceCard({required this.account, required this.sync});
   final AccountView account;
+  final SyncStatus sync;
 
   @override
   Widget build(BuildContext context) {
@@ -234,7 +245,7 @@ class _BalanceCard extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.85),
                         ),
                       ),
-                      const _SyncedPill(),
+                      _SyncPill(sync: sync, account: account),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -250,6 +261,29 @@ class _BalanceCard extends StatelessWidget {
                       color: Colors.white,
                     ),
                   ),
+                  // With money queued the headline and the server's figure
+                  // disagree, and hiding that would be the same dishonesty as
+                  // the old always-"Synced" pill.
+                  if (account.hasPending) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.schedule_rounded,
+                            size: 13,
+                            color: Colors.white.withValues(alpha: 0.8)),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${_money(account.pendingOutCents, account.currency)} '
+                          'on its way · ${_money(account.confirmedCents, account.currency)} confirmed',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -299,11 +333,33 @@ class _BalanceCard extends StatelessWidget {
   }
 }
 
-class _SyncedPill extends StatelessWidget {
-  const _SyncedPill();
+String _money(int cents, String currency) =>
+    NumberFormat.simpleCurrency(name: currency).format(cents / 100.0);
+
+/// Says what is actually true of the outbox.
+///
+/// This used to be a hardcoded "Synced", which was a lie whenever anything was
+/// queued — the one piece of copy most likely to be believed and least likely
+/// to be checked.
+class _SyncPill extends StatelessWidget {
+  const _SyncPill({required this.sync, required this.account});
+  final SyncStatus sync;
+  final AccountView account;
 
   @override
   Widget build(BuildContext context) {
+    final queued = account.pendingOutCents > 0 || sync.queued > 0;
+
+    final (icon, label) = switch (sync) {
+      SyncParked() => (Icons.pause_rounded, 'Paused'),
+      SyncInProgress() => (Icons.sync_rounded, 'Syncing'),
+      SyncIdle() when queued => (
+          Icons.schedule_rounded,
+          '${sync.queued > 0 ? sync.queued : ''} queued'.trim(),
+        ),
+      SyncIdle() => (Icons.check_rounded, 'Synced'),
+    };
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -313,16 +369,77 @@ class _SyncedPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.check_rounded, size: 13, color: Colors.white),
+          Icon(icon, size: 13, color: Colors.white),
           const SizedBox(width: 4),
           Text(
-            'Synced',
+            label,
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
               color: Colors.white.withValues(alpha: 0.95),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The queue has stopped and needs a person. Shown rather than hidden: silent
+/// failure is exactly what an offline-first app must not do with money.
+class _ParkedBanner extends StatelessWidget {
+  const _ParkedBanner({required this.parked});
+  final SyncParked parked;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final cubit = context.read<DashboardCubit>();
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: t.danger.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(WalletTokens.rAvatar),
+        border: Border.all(color: t.danger.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.pause_circle_outline_rounded, size: 20, color: t.danger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sync paused',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: t.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  parked.reason,
+                  style: TextStyle(fontSize: 11.5, color: t.textMuted),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: cubit.retrySync,
+            child: Text('Retry',
+                style: TextStyle(
+                    color: t.accent, fontWeight: FontWeight.w700)),
+          ),
+          if (parked.blockedTxId case final blocked?)
+            TextButton(
+              onPressed: () => cubit.cancelQueued(blocked),
+              child: Text('Cancel',
+                  style: TextStyle(
+                      color: t.textMuted, fontWeight: FontWeight.w700)),
+            ),
         ],
       ),
     );

@@ -11,7 +11,7 @@ import 'package:offline_first_wallet/data/models/remote_transaction.dart';
 import 'package:offline_first_wallet/data/repositories/wallet_repository_impl.dart';
 import 'package:offline_first_wallet/data/sync/backoff_policy.dart';
 import 'package:offline_first_wallet/data/sync/sync_service.dart';
-import 'package:offline_first_wallet/data/sync/sync_status.dart';
+import 'package:offline_first_wallet/domain/entities/sync_status.dart';
 import 'package:offline_first_wallet/domain/entities/transaction.dart';
 import 'package:offline_first_wallet/domain/entities/tx_status.dart';
 

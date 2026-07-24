@@ -9,11 +9,17 @@ class SuccessPage extends StatelessWidget {
   const SuccessPage({
     required this.amountCents,
     required this.recipient,
+    this.queued = false,
     super.key,
   });
 
   final int amountCents;
   final String recipient;
+
+  /// Whether the transfer is still sitting in the outbox. The queued note is
+  /// only shown when it is actually true — a confirmation screen that always
+  /// claims "queued offline" teaches users to ignore it.
+  final bool queued;
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +63,7 @@ class SuccessPage extends StatelessWidget {
                 style: TextStyle(fontSize: 14, color: t.textMuted),
               ),
               const SizedBox(height: 22),
-              const _OfflineNote(),
+              if (queued) const _OfflineNote(),
               const Spacer(flex: 4),
               GradientButton(
                 label: 'Done',

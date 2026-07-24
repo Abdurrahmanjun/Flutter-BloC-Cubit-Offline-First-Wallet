@@ -20,13 +20,22 @@ class DashboardLoading extends DashboardState {
 
 /// Loaded — [account] and [transactions] are guaranteed present.
 class DashboardLoaded extends DashboardState {
-  const DashboardLoaded({required this.account, required this.transactions});
+  const DashboardLoaded({
+    required this.account,
+    required this.transactions,
+    this.sync = const SyncIdle(),
+  });
 
   /// Carries the derived spendable balance, not the raw stored one.
   final AccountView account;
   final List<WalletTransaction> transactions;
+
+  /// What the outbox worker is doing, so the screen can stop claiming
+  /// "Synced" while transfers are still waiting to go out.
+  final SyncStatus sync;
+
   @override
-  List<Object?> get props => [account, transactions];
+  List<Object?> get props => [account, transactions, sync];
 }
 
 /// A load failed; [message] is user-facing.

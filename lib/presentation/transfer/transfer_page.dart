@@ -54,13 +54,14 @@ class _TransferPageState extends State<TransferPage> {
       child: BlocConsumer<TransferBloc, TransferState>(
         listener: (context, state) {
           switch (state) {
-            case TransferSucceeded():
+            case TransferSucceeded(:final queued):
               // Replace Send with Success; its "Done" returns to Home.
               Navigator.of(context).pushReplacement(
                 fadeSlideRoute<void>(
                   SuccessPage(
                     amountCents: (_amount * 100).round(),
                     recipient: _toController.text.trim(),
+                    queued: queued,
                   ),
                 ),
               );

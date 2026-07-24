@@ -6,6 +6,7 @@ import '../../data/datasources/wallet_remote_datasource.dart';
 import '../../data/repositories/wallet_repository_impl.dart';
 import '../../data/sync/sync_service.dart';
 import '../../domain/repositories/wallet_repository.dart';
+import '../../domain/repositories/wallet_sync.dart';
 import '../../domain/usecases/get_account.dart';
 import '../../domain/usecases/get_transactions.dart';
 import '../../domain/usecases/make_transfer.dart';
@@ -43,6 +44,10 @@ Future<void> initInjector() async {
     ),
   );
 
+  // Presentation talks to the worker through the domain abstraction; only
+  // main() needs the concrete type, for start-up and lifecycle hooks.
+  sl.registerLazySingleton<WalletSync>(() => sl<SyncService>());
+
   // Use cases
   sl.registerLazySingleton(() => GetAccount(sl()));
   sl.registerLazySingleton(() => GetTransactions(sl()));
@@ -55,6 +60,7 @@ Future<void> initInjector() async {
         getAccount: sl(),
         getTransactions: sl(),
         refreshWallet: sl(),
+        sync: sl(),
       ));
   sl.registerFactory(() => TransferBloc(sl()));
 }

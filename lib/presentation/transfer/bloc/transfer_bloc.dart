@@ -1,6 +1,7 @@
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../domain/entities/tx_status.dart';
 import '../../../domain/usecases/make_transfer.dart';
 
 part 'transfer_event.dart';
@@ -26,7 +27,9 @@ class TransferBloc extends Bloc<TransferEvent, TransferState> {
     );
     emit(result.fold(
       (f) => TransferFailed(f.message),
-      (_) => const TransferSucceeded(),
+      // Both outcomes are a success — the transfer is durable either way. They
+      // differ only in what the confirmation screen may honestly claim.
+      (tx) => TransferSucceeded(queued: tx.status is Pending),
     ));
   }
 }

@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:math';
 
 import '../../core/error/exceptions.dart';
+import '../../domain/entities/sync_status.dart';
 import '../../domain/entities/tx_status.dart';
+import '../../domain/repositories/wallet_sync.dart';
 import '../datasources/wallet_local_datasource.dart';
 import '../datasources/wallet_remote_datasource.dart';
 import 'backoff_policy.dart';
-import 'sync_status.dart';
 
 /// Drains the outbox: the piece that makes "syncs when you reconnect" true.
 ///
@@ -22,7 +23,7 @@ import 'sync_status.dart';
 ///  * **Rejections are terminal.** A transfer the server refused is closed
 ///    out, never retried. Retrying it would fail identically forever while
 ///    blocking everything behind it.
-class SyncService {
+class SyncService implements WalletSync {
   SyncService({
     required WalletLocalDataSource local,
     required WalletRemoteDataSource remote,
@@ -63,7 +64,9 @@ class SyncService {
 
   SyncStatus _current = const SyncIdle();
 
+  @override
   Stream<SyncStatus> get status => _status.stream;
+  @override
   SyncStatus get current => _current;
   bool get isParked => _parked;
 
@@ -80,6 +83,7 @@ class SyncService {
   /// queue and no event coming.
   Future<void> onResumed() => sync();
 
+  @override
   Future<void> sync() async {
     if (_draining || _parked) return;
     _draining = true;
@@ -139,6 +143,7 @@ class SyncService {
 
   /// The user's escape hatch for a transfer stuck at the head of the queue.
   /// Closing it out unblocks everything behind it.
+  @override
   Future<void> cancelQueued(String txId) async {
     await _local.markRejected(txId: txId, reason: 'Cancelled');
     _parked = false;
@@ -150,6 +155,7 @@ class SyncService {
   /// The attempt counters are cleared too. Without that, the row that parked
   /// the queue is still at the cap and the very next drain parks again, making
   /// this a no-op. An explicit request from the user is a fresh start.
+  @override
   Future<void> resume() async {
     await _local.resetRetries();
     _parked = false;

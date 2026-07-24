@@ -18,9 +18,18 @@ class TransferInProgress extends TransferState {
   const TransferInProgress();
 }
 
-/// The transfer committed successfully.
+/// The transfer committed successfully to the local database.
+///
+/// [queued] distinguishes "the server has it" from "it is waiting in the
+/// outbox". Both are successes; only one of them may tell the user their
+/// money has arrived.
 class TransferSucceeded extends TransferState {
-  const TransferSucceeded();
+  const TransferSucceeded({this.queued = false});
+
+  final bool queued;
+
+  @override
+  List<Object?> get props => [queued];
 }
 
 /// The transfer failed; [message] is user-facing.
