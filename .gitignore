@@ -17,6 +17,7 @@ ios/Pods/
 
 # Working notes — local only
 docs/offline-first-plan.md
+docs/design-rationale.md
 
 # Reference server (its own Dart package)
 server/.dart_tool/
